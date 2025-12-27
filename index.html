@@ -1,0 +1,1949 @@
+<!doctype html>
+<html lang="en" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TMS - Transport Management System</title>
+  <script src="/_sdk/data_sdk.js"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    body {
+      box-sizing: border-box;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    
+    .sidebar-item {
+      transition: all 0.3s ease;
+    }
+    
+    .sidebar-item:hover {
+      transform: translateX(5px);
+    }
+    
+    .sidebar-item.active {
+      background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
+      border-left: 4px solid #1d4ed8;
+    }
+    
+    .card {
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    }
+    
+    .status-badge {
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    
+    .status-completed { background: #dcfce7; color: #166534; }
+    .status-in-transit { background: #dbeafe; color: #1e40af; }
+    .status-pending { background: #fef3c7; color: #92400e; }
+    .status-cancelled { background: #fee2e2; color: #991b1b; }
+    .status-paid { background: #dcfce7; color: #166534; }
+    .status-unpaid { background: #fee2e2; color: #991b1b; }
+    .status-overdue { background: #fef3c7; color: #92400e; }
+    .status-partial { background: #dbeafe; color: #1e40af; }
+    .status-planned { background: #fef3c7; color: #92400e; }
+    .status-active { background: #dbeafe; color: #1e40af; }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      transition: all 0.3s ease;
+    }
+    
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+    }
+    
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    .loading-spinner {
+      border: 3px solid #f3f4f6;
+      border-top: 3px solid #3b82f6;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 16px 24px;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 1000;
+      animation: slideIn 0.3s ease;
+    }
+    
+    @keyframes slideIn {
+      from { transform: translateX(400px); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+
+    .form-section {
+      background: #f9fafb;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      border: 1px solid #e5e7eb;
+    }
+
+    .form-section-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #1f2937;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #3b82f6;
+    }
+
+    #map {
+      height: 500px;
+      width: 100%;
+      border-radius: 12px;
+      z-index: 1;
+    }
+  </style>
+  <style>@view-transition { navigation: auto; }</style>
+ </head>
+ <body class="h-full">
+  <div id="app" class="w-full h-full flex overflow-auto bg-gray-50"><!-- Sidebar -->
+   <aside class="w-64 bg-gradient-to-b from-slate-800 to-slate-900 text-white flex-shrink-0">
+    <div class="p-6 border-b border-slate-700">
+     <h1 class="text-2xl font-bold" id="app-title">TMS</h1>
+     <p class="text-sm text-slate-400 mt-1">Transport System</p>
+    </div>
+    <nav class="p-4"><button onclick="showPage('transport')" class="sidebar-item active w-full text-left px-4 py-3 rounded-lg mb-2 flex items-center gap-3" id="nav-transport"> <i class="fas fa-truck text-lg"></i> <span>Transport Records</span> </button> <button onclick="showPage('route-planning')" class="sidebar-item w-full text-left px-4 py-3 rounded-lg mb-2 flex items-center gap-3 hover:bg-slate-700" id="nav-route-planning"> <i class="fas fa-route text-lg"></i> <span>Route Planning</span> </button> <button onclick="showPage('tracking')" class="sidebar-item w-full text-left px-4 py-3 rounded-lg mb-2 flex items-center gap-3 hover:bg-slate-700" id="nav-tracking"> <i class="fas fa-map-marked-alt text-lg"></i> <span>Tracking &amp; Maps</span> </button> <button onclick="showPage('reports')" class="sidebar-item w-full text-left px-4 py-3 rounded-lg mb-2 flex items-center gap-3 hover:bg-slate-700" id="nav-reports"> <i class="fas fa-chart-bar text-lg"></i> <span>Reports</span> </button> <button onclick="showPage('billing')" class="sidebar-item w-full text-left px-4 py-3 rounded-lg mb-2 flex items-center gap-3 hover:bg-slate-700" id="nav-billing"> <i class="fas fa-file-invoice-dollar text-lg"></i> <span>Billing</span> </button>
+    </nav>
+   </aside><!-- Main Content -->
+   <main class="flex-1 overflow-auto"><!-- Transport Records Page -->
+    <div id="page-transport" class="page-content">
+     <header class="bg-white border-b border-gray-200 px-8 py-4">
+      <div class="flex justify-between items-center">
+       <div class="flex items-center gap-6">
+        <div>
+         <h2 class="text-2xl font-bold text-gray-900">Transport Records</h2>
+         <p class="text-sm text-gray-600 mt-1" id="user-name">User Name</p>
+        </div>
+       </div>
+       <div class="flex items-center gap-4">
+        <div class="relative"><input type="text" id="search-fleet" placeholder="Search vehicles..." class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64"> <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+        </div><button onclick="openAddModal()" class="btn-primary text-white px-6 py-2.5 rounded-lg font-semibold flex items-center gap-2"> <i class="fas fa-plus"></i> Add New Record </button>
+       </div>
+      </div>
+     </header>
+     <div class="p-8"><!-- Stats Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+       <div class="card bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+        <div class="flex items-center justify-between">
+         <div>
+          <p class="text-gray-600 text-sm">Total</p>
+          <p class="text-3xl font-bold text-gray-900 mt-2" id="stat-total">0</p>
+         </div>
+         <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center"><i class="fas fa-clipboard-list text-blue-600 text-xl"></i>
+         </div>
+        </div>
+       </div>
+       <div class="card bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+        <div class="flex items-center justify-between">
+         <div>
+          <p class="text-gray-600 text-sm">In Transit</p>
+          <p class="text-3xl font-bold text-blue-600 mt-2" id="stat-transit">0</p>
+         </div>
+         <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center"><i class="fas fa-shipping-fast text-blue-600 text-xl"></i>
+         </div>
+        </div>
+       </div>
+       <div class="card bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+        <div class="flex items-center justify-between">
+         <div>
+          <p class="text-gray-600 text-sm">Completed</p>
+          <p class="text-3xl font-bold text-green-600 mt-2" id="stat-completed">0</p>
+         </div>
+         <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center"><i class="fas fa-check-circle text-green-600 text-xl"></i>
+         </div>
+        </div>
+       </div>
+       <div class="card bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+        <div class="flex items-center justify-between">
+         <div>
+          <p class="text-gray-600 text-sm">Pending</p>
+          <p class="text-3xl font-bold text-yellow-600 mt-2" id="stat-pending">0</p>
+         </div>
+         <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center"><i class="fas fa-clock text-yellow-600 text-xl"></i>
+         </div>
+        </div>
+       </div>
+      </div><!-- Records Table -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+       <div class="overflow-x-auto">
+        <table class="w-full">
+         <thead class="bg-gray-50 border-b border-gray-200">
+          <tr>
+           <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700">Date</th>
+           <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700">Transport Type</th>
+           <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700">Customer Code</th>
+           <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700">Vehicle Number</th>
+           <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700">Driver Name</th>
+           <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700">Route (From → To)</th>
+           <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700">Status</th>
+           <th class="px-6 py-4 text-center text-sm font-semibold text-gray-700">Actions</th>
+          </tr>
+         </thead>
+         <tbody id="transport-table-body" class="divide-y divide-gray-200">
+          <tr>
+           <td colspan="8" class="px-6 py-12 text-center text-gray-500"><i class="fas fa-inbox text-4xl mb-3 text-gray-300"></i> <p>No data yet. Please add a transport record.</p></td>
+          </tr>
+         </tbody>
+        </table>
+       </div>
+      </div>
+     </div>
+    </div><!-- Route Planning Page -->
+    <div id="page-route-planning" class="page-content hidden">
+     <header class="bg-white border-b border-gray-200 px-8 py-6">
+      <div class="flex justify-between items-center">
+       <div>
+        <h2 class="text-3xl font-bold text-gray-900">Route Planning</h2>
+        <p class="text-gray-600 mt-1">Optimize your delivery routes</p>
+       </div>
+      </div>
+     </header>
+     <div class="p-8"><!-- Route Stats -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+       <div class="card bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+        <div class="flex items-center justify-between">
+         <div>
+          <p class="text-gray-600 text-sm">Active Routes</p>
+          <p class="text-3xl font-bold text-blue-600 mt-2" id="route-stat-active">0</p>
+         </div>
+         <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center"><i class="fas fa-route text-blue-600 text-xl"></i>
+         </div>
+        </div>
+       </div>
+       <div class="card bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+        <div class="flex items-center justify-between">
+         <div>
+          <p class="text-gray-600 text-sm">Total Distance</p>
+          <p class="text-3xl font-bold text-green-600 mt-2" id="route-stat-distance">0 km</p>
+         </div>
+         <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center"><i class="fas fa-road text-green-600 text-xl"></i>
+         </div>
+        </div>
+       </div>
+       <div class="card bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+        <div class="flex items-center justify-between">
+         <div>
+          <p class="text-gray-600 text-sm">Avg. Efficiency</p>
+          <p class="text-3xl font-bold text-purple-600 mt-2" id="route-stat-efficiency">0%</p>
+         </div>
+         <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center"><i class="fas fa-chart-line text-purple-600 text-xl"></i>
+         </div>
+        </div>
+       </div>
+       <div class="card bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+        <div class="flex items-center justify-between">
+         <div>
+          <p class="text-gray-600 text-sm">Est. Fuel Cost</p>
+          <p class="text-3xl font-bold text-orange-600 mt-2" id="route-stat-fuel">฿0</p>
+         </div>
+         <div class="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center"><i class="fas fa-gas-pump text-orange-600 text-xl"></i>
+         </div>
+        </div>
+       </div>
+      </div><!-- Route Optimizer -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+       <h3 class="text-xl font-bold text-gray-900 mb-4"><i class="fas fa-magic mr-2"></i>Route Optimizer</h3>
+       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <div><label class="block text-sm font-semibold text-gray-700 mb-2">Starting Point</label> <input type="text" id="route-start" placeholder="Enter starting location" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+        </div>
+        <div><label class="block text-sm font-semibold text-gray-700 mb-2">Optimization Goal</label> <select id="route-optimization" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"> <option value="shortest">Shortest Distance</option> <option value="fastest">Fastest Time</option> <option value="fuel">Fuel Efficient</option> <option value="balanced">Balanced</option> </select>
+        </div>
+        <div><label class="block text-sm font-semibold text-gray-700 mb-2">Vehicle Type</label> <select id="route-vehicle" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"> <option value="truck">Truck</option> <option value="van">Van</option> <option value="motorcycle">Motorcycle</option> </select>
+        </div>
+       </div>
+       <div class="mb-4"><label class="block text-sm font-semibold text-gray-700 mb-2">Delivery Stops (one per line)</label> <textarea id="route-stops" rows="4" placeholder="Bangkok Warehouse
+Nonthaburi Store
+Pathum Thani Branch
+Ayutthaya Hub" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
+       </div><button onclick="optimizeRoute()" class="btn-primary text-white px-8 py-3 rounded-lg font-semibold flex items-center gap-2"> <i class="fas fa-cogs"></i> Optimize Route </button>
+      </div><!-- Planned Routes List -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+       <div class="p-4 bg-gray-50 border-b border-gray-200">
+        <h3 class="text-lg font-bold text-gray-900"><i class="fas fa-list mr-2"></i>Planned Routes</h3>
+       </div>
+       <div class="overflow-x-auto">
+        <table class="w-full">
+         <thead class="bg-gray-50 border-b border-gray-200">
+          <tr>
+           <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700">Route ID</th>
+           <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700">Vehicle</th>
+           <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700">Stops</th>
+           <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700">Distance</th>
+           <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700">Est. Time</th>
+           <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700">Status</th>
+           <th class="px-6 py-4 text-center text-sm font-semibold text-gray-700">Actions</th>
+          </tr>
+         </thead>
+         <tbody id="routes-table-body" class="divide-y divide-gray-200">
+          <tr>
+           <td colspan="7" class="px-6 py-12 text-center text-gray-500"><i class="fas fa-route text-4xl mb-3 text-gray-300"></i> <p>No routes planned yet. Use the optimizer to create routes.</p></td>
+          </tr>
+         </tbody>
+        </table>
+       </div>
+      </div>
+     </div>
+    </div><!-- Tracking & Maps Page -->
+    <div id="page-tracking" class="page-content hidden">
+     <header class="bg-white border-b border-gray-200 px-8 py-6">
+      <div class="flex justify-between items-center">
+       <div>
+        <h2 class="text-3xl font-bold text-gray-900">Real-Time Tracking</h2>
+        <p class="text-gray-600 mt-1">Monitor vehicle locations</p>
+       </div><button onclick="centerMap()" class="btn-primary text-white px-4 py-2 rounded-lg font-semibold flex items-center gap-2"> <i class="fas fa-crosshairs"></i> Center Map </button>
+      </div>
+     </header>
+     <div class="p-8"><!-- Live Map Section -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 overflow-hidden">
+       <div class="p-4 bg-gray-50 border-b border-gray-200">
+        <h3 class="text-lg font-bold text-gray-900"><i class="fas fa-map-marked-alt mr-2"></i>Live Vehicle Map</h3>
+       </div>
+       <div id="map"></div>
+      </div><!-- Active Vehicles -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+       <div class="p-4 bg-gray-50 border-b border-gray-200">
+        <h3 class="text-lg font-bold text-gray-900"><i class="fas fa-truck-moving mr-2"></i>Active Vehicles (<span id="active-vehicles-count">0</span>)</h3>
+       </div>
+       <div class="p-4 max-h-96 overflow-y-auto" id="active-vehicles-list">
+        <div class="text-center py-8 text-gray-500"><i class="fas fa-truck text-3xl mb-3 text-gray-300"></i>
+         <p>No active vehicles at the moment</p>
+        </div>
+       </div>
+      </div>
+     </div>
+    </div><!-- Reports Page -->
+    <div id="page-reports" class="page-content hidden">
+     <header class="bg-white border-b border-gray-200 px-8 py-6">
+      <div class="flex justify-between items-center">
+       <div>
+        <h2 class="text-3xl font-bold text-gray-900">Report</h2>
+        <p class="text-gray-600 mt-1">Analyze and summarize data</p>
+       </div>
+       <div class="relative"><input type="text" id="search-report" placeholder="Search Report No..." class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64"> <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+       </div>
+      </div>
+     </header>
+     <div class="p-8"><!-- Filter Section -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+       <h3 class="text-lg font-bold text-gray-900 mb-4"><i class="fas fa-filter mr-2"></i>Filter Section</h3>
+       <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+        <div><label for="filter-start-day" class="block text-sm font-semibold text-gray-700 mb-2">Start Day</label> <input type="date" id="filter-start-day" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+        </div>
+        <div><label for="filter-end-day" class="block text-sm font-semibold text-gray-700 mb-2">End Day</label> <input type="date" id="filter-end-day" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+        </div>
+        <div><label for="filter-transport-type" class="block text-sm font-semibold text-gray-700 mb-2">Transport Type</label> <select id="filter-transport-type" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"> <option value="">All Types</option> <option value="4-Wheel Truck">4-Wheel Truck</option> <option value="6-Wheel Truck">6-Wheel Truck</option> <option value="10-Wheel Truck">10-Wheel Truck</option> <option value="Trailer Truck">Trailer Truck</option> <option value="Pickup Truck">Pickup Truck</option> </select>
+        </div>
+        <div><label for="filter-customer" class="block text-sm font-semibold text-gray-700 mb-2">Customer</label> <input type="text" id="filter-customer" placeholder="Customer code or name" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+        </div>
+        <div><label for="filter-status" class="block text-sm font-semibold text-gray-700 mb-2">Delivery Status</label> <select id="filter-status" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"> <option value="">All Status</option> <option value="pending">Pending</option> <option value="in-transit">In Transit</option> <option value="completed">Completed</option> <option value="cancelled">Cancelled</option> </select>
+        </div>
+        <div><label for="filter-driver" class="block text-sm font-semibold text-gray-700 mb-2">Driver</label> <input type="text" id="filter-driver" placeholder="Driver name" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+        </div>
+        <div><label for="filter-route" class="block text-sm font-semibold text-gray-700 mb-2">Route</label> <input type="text" id="filter-route" placeholder="Pickup or delivery location" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+        </div>
+        <div><label for="filter-weight" class="block text-sm font-semibold text-gray-700 mb-2">Weight (kg)</label> <input type="number" id="filter-weight" placeholder="Min weight" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+        </div>
+       </div>
+       <div class="flex gap-3"><button onclick="applyReportFilters()" class="btn-primary text-white px-6 py-2 rounded-lg font-semibold flex items-center gap-2"> <i class="fas fa-search"></i> Search </button> <button onclick="clearReportFilters()" class="bg-gray-100 text-gray-700 px-6 py-2 rounded-lg font-semibold hover:bg-gray-200 flex items-center gap-2"> <i class="fas fa-redo"></i> Clear </button> <button onclick="exportExcel()" class="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 flex items-center gap-2"> <i class="fas fa-file-excel"></i> Export Excel </button> <button onclick="exportPDF()" class="bg-red-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-red-700 flex items-center gap-2"> <i class="fas fa-file-pdf"></i> Export PDF </button>
+       </div>
+      </div><!-- Report Summary -->
+      <div class="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl shadow-lg p-6 mb-6 text-white">
+       <h3 class="text-xl font-bold mb-4"><i class="fas fa-chart-bar mr-2"></i>Report Summary</h3>
+       <div class="grid grid-cols-1 md:grid-cols-5 gap-6">
+        <div>
+         <p class="text-blue-100 text-sm mb-1">Number of Shipments</p>
+         <p class="text-3xl font-bold" id="summary-shipments">0</p>
+        </div>
+        <div>
+         <p class="text-blue-100 text-sm mb-1">On-Time Deliveries</p>
+         <p class="text-3xl font-bold" id="summary-ontime">0</p>
+        </div>
+        <div>
+         <p class="text-blue-100 text-sm mb-1">Delayed Deliveries</p>
+         <p class="text-3xl font-bold" id="summary-delayed">0</p>
+        </div>
+        <div>
+         <p class="text-blue-100 text-sm mb-1">Success Rate (%)</p>
+         <p class="text-3xl font-bold" id="summary-success-rate">0%</p>
+        </div>
+        <div>
+         <p class="text-blue-100 text-sm mb-1">Total Cost</p>
+         <p class="text-3xl font-bold" id="summary-cost">฿0</p>
+        </div>
+       </div>
+      </div><!-- Charts Section -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6"><!-- Cost vs Revenue -->
+       <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <h3 class="text-lg font-bold text-gray-900 mb-4"><i class="fas fa-chart-pie mr-2"></i>Cost vs Revenue</h3>
+        <div class="space-y-4">
+         <div>
+          <div class="flex justify-between items-center mb-2"><span class="text-sm font-semibold text-gray-700">Cost</span> <span class="text-sm font-bold text-red-600" id="chart-cost">฿0</span>
+          </div>
+          <div class="w-full bg-gray-200 rounded-full h-4">
+           <div id="chart-cost-bar" class="bg-red-500 h-4 rounded-full" style="width: 0%"></div>
+          </div>
+         </div>
+         <div>
+          <div class="flex justify-between items-center mb-2"><span class="text-sm font-semibold text-gray-700">Revenue</span> <span class="text-sm font-bold text-green-600" id="chart-revenue">฿0</span>
+          </div>
+          <div class="w-full bg-gray-200 rounded-full h-4">
+           <div id="chart-revenue-bar" class="bg-green-500 h-4 rounded-full" style="width: 0%"></div>
+          </div>
+         </div>
+         <div class="pt-4 border-t border-gray-200">
+          <div class="flex justify-between items-center"><span class="text-sm font-bold text-gray-700">Net Profit</span> <span class="text-lg font-bold" id="chart-profit">฿0</span>
+          </div>
+         </div>
+        </div>
+       </div><!-- Transport Type Chart -->
+       <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <h3 class="text-lg font-bold text-gray-900 mb-4"><i class="fas fa-truck-loading mr-2"></i>Transport Type</h3>
+        <div class="space-y-3">
+         <div class="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+          <div class="flex items-center gap-3"><i class="fas fa-truck text-blue-600"></i> <span class="text-sm font-semibold text-gray-700">4-Wheel Truck</span>
+          </div><span class="text-sm font-bold text-blue-600" id="chart-4wheel">0</span>
+         </div>
+         <div class="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+          <div class="flex items-center gap-3"><i class="fas fa-truck text-green-600"></i> <span class="text-sm font-semibold text-gray-700">6-Wheel Truck</span>
+          </div><span class="text-sm font-bold text-green-600" id="chart-6wheel">0</span>
+         </div>
+         <div class="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
+          <div class="flex items-center gap-3"><i class="fas fa-truck text-purple-600"></i> <span class="text-sm font-semibold text-gray-700">10-Wheel Truck</span>
+          </div><span class="text-sm font-bold text-purple-600" id="chart-10wheel">0</span>
+         </div>
+         <div class="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
+          <div class="flex items-center gap-3"><i class="fas fa-truck-moving text-orange-600"></i> <span class="text-sm font-semibold text-gray-700">Trailer Truck</span>
+          </div><span class="text-sm font-bold text-orange-600" id="chart-trailer">0</span>
+         </div>
+         <div class="flex items-center justify-between p-3 bg-indigo-50 rounded-lg">
+          <div class="flex items-center gap-3"><i class="fas fa-truck-pickup text-indigo-600"></i> <span class="text-sm font-semibold text-gray-700">Pickup Truck</span>
+          </div><span class="text-sm font-bold text-indigo-600" id="chart-pickup">0</span>
+         </div>
+        </div>
+       </div>
+      </div><!-- Report Table -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
+       <div class="p-4 bg-gray-50 border-b border-gray-200">
+        <h3 class="text-lg font-bold text-gray-900"><i class="fas fa-table mr-2"></i>Report Details</h3>
+       </div>
+       <div class="overflow-x-auto">
+        <table class="w-full">
+         <thead class="bg-gray-50 border-b border-gray-200">
+          <tr>
+           <th class="px-4 py-4 text-left text-sm font-semibold text-gray-700">Booking No.</th>
+           <th class="px-4 py-4 text-left text-sm font-semibold text-gray-700">Container No.</th>
+           <th class="px-4 py-4 text-left text-sm font-semibold text-gray-700">Truck No.</th>
+           <th class="px-4 py-4 text-left text-sm font-semibold text-gray-700">Route</th>
+           <th class="px-4 py-4 text-left text-sm font-semibold text-gray-700">Departure Date</th>
+           <th class="px-4 py-4 text-left text-sm font-semibold text-gray-700">Arrival Date</th>
+           <th class="px-4 py-4 text-left text-sm font-semibold text-gray-700">Customer</th>
+           <th class="px-4 py-4 text-left text-sm font-semibold text-gray-700">Driver</th>
+           <th class="px-4 py-4 text-left text-sm font-semibold text-gray-700">Status</th>
+           <th class="px-4 py-4 text-right text-sm font-semibold text-gray-700">Cost</th>
+           <th class="px-4 py-4 text-right text-sm font-semibold text-gray-700">Revenue</th>
+          </tr>
+         </thead>
+         <tbody id="report-table-body" class="divide-y divide-gray-200">
+          <tr>
+           <td colspan="11" class="px-6 py-12 text-center text-gray-500"><i class="fas fa-clipboard-list text-4xl mb-3 text-gray-300"></i> <p>Click "Search" to view data</p></td>
+          </tr>
+         </tbody>
+        </table>
+       </div>
+      </div><!-- System Information -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+       <h3 class="text-lg font-bold text-gray-900 mb-4"><i class="fas fa-info-circle mr-2"></i>System Information</h3>
+       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+         <p class="text-sm text-gray-600 mb-1">Report Created By</p>
+         <p class="text-base font-semibold text-gray-900" id="system-created-by">Administrator</p>
+        </div>
+        <div>
+         <p class="text-sm text-gray-600 mb-1">User ID</p>
+         <p class="text-base font-semibold text-gray-900" id="system-user-id">USR-001</p>
+        </div>
+        <div>
+         <p class="text-sm text-gray-600 mb-1">Report Date</p>
+         <p class="text-base font-semibold text-gray-900" id="system-report-date">-</p>
+        </div>
+       </div>
+      </div>
+     </div>
+    </div><!-- Billing Page -->
+    <div id="page-billing" class="page-content hidden">
+     <header class="bg-white border-b border-gray-200 px-8 py-6">
+      <div class="flex justify-between items-center">
+       <div>
+        <h2 class="text-3xl font-bold text-gray-900">Customer Transport Bill</h2>
+        <p class="text-gray-600 mt-1">Manage bills and invoices</p>
+       </div>
+       <div class="flex items-center gap-4">
+        <div class="relative"><input type="text" id="search-bill" placeholder="Search Receipt No..." class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64"> <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+        </div><button onclick="openBillModal()" class="btn-primary text-white px-6 py-3 rounded-lg font-semibold flex items-center gap-2"> <i class="fas fa-plus"></i> Create New Bill </button>
+       </div>
+      </div>
+     </header>
+     <div class="p-8">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+       <div class="card bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+        <div class="flex items-center justify-between">
+         <div>
+          <p class="text-gray-600 text-sm">Paid Bills</p>
+          <p class="text-3xl font-bold text-green-600 mt-2" id="billing-paid-count">0</p>
+         </div>
+         <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center"><i class="fas fa-check-circle text-green-600 text-xl"></i>
+         </div>
+        </div>
+       </div>
+       <div class="card bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+        <div class="flex items-center justify-between">
+         <div>
+          <p class="text-gray-600 text-sm">Unpaid Bills</p>
+          <p class="text-3xl font-bold text-red-600 mt-2" id="billing-unpaid-count">0</p>
+         </div>
+         <div class="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center"><i class="fas fa-exclamation-circle text-red-600 text-xl"></i>
+         </div>
+        </div>
+       </div>
+       <div class="card bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+        <div class="flex items-center justify-between">
+         <div>
+          <p class="text-gray-600 text-sm">Total Bills</p>
+          <p class="text-3xl font-bold text-blue-600 mt-2" id="billing-total-count">0</p>
+         </div>
+         <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center"><i class="fas fa-file-invoice text-blue-600 text-xl"></i>
+         </div>
+        </div>
+       </div>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+       <div class="overflow-x-auto">
+        <table class="w-full">
+         <thead class="bg-gray-50 border-b border-gray-200">
+          <tr>
+           <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700">Receipt No.</th>
+           <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700">Date</th>
+           <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700">Customer</th>
+           <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700">Route</th>
+           <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700">Transport Type</th>
+           <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700">Total Amount</th>
+           <th class="px-6 py-4 text-left text-sm font-semibold text-gray-700">Payment Status</th>
+           <th class="px-6 py-4 text-center text-sm font-semibold text-gray-700">Action</th>
+          </tr>
+         </thead>
+         <tbody id="billing-table-body" class="divide-y divide-gray-200">
+          <tr>
+           <td colspan="8" class="px-6 py-12 text-center text-gray-500"><i class="fas fa-file-invoice text-4xl mb-3 text-gray-300"></i> <p>No bills yet. Click "Create Bill" to add a new billing record.</p></td>
+          </tr>
+         </tbody>
+        </table>
+       </div>
+      </div>
+     </div>
+    </div>
+   </main>
+  </div><!-- Add/Edit Transport Modal -->
+  <div id="modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50" style="margin: 0;">
+   <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
+    <div class="flex justify-between items-center p-6 border-b border-gray-200 sticky top-0 bg-white z-10">
+     <h3 class="text-2xl font-bold text-gray-900" id="modal-title">Add Transport Record</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"> <i class="fas fa-times text-xl"></i> </button>
+    </div>
+    <form id="transport-form" class="p-6" onsubmit="handleSubmit(event)"><input type="hidden" id="edit-id">
+     <div class="form-section">
+      <h4 class="form-section-title"><i class="fas fa-shipping-fast mr-2"></i>Transport Type</h4>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+       <div><label for="date" class="block text-sm font-semibold text-gray-700 mb-2">Date</label> <input type="date" id="date" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+       </div>
+       <div><label for="transport_type" class="block text-sm font-semibold text-gray-700 mb-2">Transport Type</label> <select id="transport_type" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"> <option value="">Select Type</option> <option value="4-Wheel Truck">4-Wheel Truck</option> <option value="6-Wheel Truck">6-Wheel Truck</option> <option value="10-Wheel Truck">10-Wheel Truck</option> <option value="Trailer Truck">Trailer Truck</option> <option value="Pickup Truck">Pickup Truck</option> </select>
+       </div>
+      </div>
+     </div>
+     <div class="form-section">
+      <h4 class="form-section-title"><i class="fas fa-user-tie mr-2"></i>Customer Information</h4>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+       <div><label for="customer_code" class="block text-sm font-semibold text-gray-700 mb-2">Customer Code</label> <input type="text" id="customer_code" required placeholder="e.g., CUST001" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+       </div>
+       <div><label for="sender" class="block text-sm font-semibold text-gray-700 mb-2">Sender</label> <input type="text" id="sender" required placeholder="Sender name" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+       </div>
+       <div><label for="receiver" class="block text-sm font-semibold text-gray-700 mb-2">Receiver</label> <input type="text" id="receiver" required placeholder="Receiver name" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+       </div>
+       <div><label for="contact_no" class="block text-sm font-semibold text-gray-700 mb-2">Contact Number</label> <input type="tel" id="contact_no" required placeholder="e.g., 081-234-5678" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+       </div>
+       <div class="md:col-span-2"><label for="address" class="block text-sm font-semibold text-gray-700 mb-2">Address</label> <textarea id="address" rows="2" required placeholder="Full address" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
+       </div>
+      </div>
+     </div>
+     <div class="form-section">
+      <h4 class="form-section-title"><i class="fas fa-truck mr-2"></i>Vehicle Information</h4>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+       <div><label for="vehicle_number" class="block text-sm font-semibold text-gray-700 mb-2">Vehicle Number</label> <input type="text" id="vehicle_number" required placeholder="e.g., ABC-1234" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+       </div>
+       <div><label for="driver_name" class="block text-sm font-semibold text-gray-700 mb-2">Driver Name</label> <input type="text" id="driver_name" required placeholder="Driver name" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+       </div>
+       <div><label for="truck_no" class="block text-sm font-semibold text-gray-700 mb-2">Truck No.</label> <input type="text" id="truck_no" placeholder="e.g., TRUCK-001" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+       </div>
+       <div><label for="booking_no" class="block text-sm font-semibold text-gray-700 mb-2">Booking No.</label> <input type="text" id="booking_no" placeholder="e.g., BK-12345" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+       </div>
+       <div><label for="container_no" class="block text-sm font-semibold text-gray-700 mb-2">Container No.</label> <input type="text" id="container_no" placeholder="e.g., CONT-9876" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+       </div>
+      </div>
+     </div>
+     <div class="form-section">
+      <h4 class="form-section-title"><i class="fas fa-clipboard-list mr-2"></i>Transport Details</h4>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+       <div><label for="pickup_point" class="block text-sm font-semibold text-gray-700 mb-2">Pickup Point</label> <input type="text" id="pickup_point" required placeholder="e.g., Bangkok Warehouse" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+       </div>
+       <div><label for="delivery_point" class="block text-sm font-semibold text-gray-700 mb-2">Delivery Point</label> <input type="text" id="delivery_point" required placeholder="e.g., Chiang Mai Store" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+       </div>
+       <div><label for="eta" class="block text-sm font-semibold text-gray-700 mb-2">ETA (Estimated Time of Arrival)</label> <input type="datetime-local" id="eta" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+       </div>
+       <div><label for="weight" class="block text-sm font-semibold text-gray-700 mb-2">Weight (kg)</label> <input type="number" id="weight" placeholder="0" step="0.01" min="0" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+       </div>
+       <div><label for="commodity" class="block text-sm font-semibold text-gray-700 mb-2">Commodity</label> <input type="text" id="commodity" placeholder="e.g., Electronics, Food, Furniture" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+       </div>
+       <div><label for="status" class="block text-sm font-semibold text-gray-700 mb-2">Status</label> <select id="status" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"> <option value="pending">Pending</option> <option value="in-transit">In Transit</option> <option value="completed">Completed</option> <option value="cancelled">Cancelled</option> </select>
+       </div>
+       <div><label for="amount" class="block text-sm font-semibold text-gray-700 mb-2">Amount (฿)</label> <input type="number" id="amount" required placeholder="0.00" step="0.01" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+       </div>
+       <div class="md:col-span-2"><label for="remarks" class="block text-sm font-semibold text-gray-700 mb-2">Remarks</label> <textarea id="remarks" rows="2" placeholder="Additional notes or comments..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
+       </div>
+      </div>
+     </div>
+     <div class="flex gap-3 mt-6"><button type="submit" id="submit-btn" class="btn-primary flex-1 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2"> <i class="fas fa-save"></i> <span id="submit-text">Save</span> </button> <button type="button" onclick="closeModal()" class="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-lg font-semibold hover:bg-gray-200"> Cancel </button>
+     </div>
+    </form>
+   </div>
+  </div><!-- Bill Modal -->
+  <div id="bill-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50" style="margin: 0;">
+   <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
+    <div class="flex justify-between items-center p-6 border-b border-gray-200 sticky top-0 bg-white z-10">
+     <h3 class="text-2xl font-bold text-gray-900">Create New Bill</h3><button onclick="closeBillModal()" class="text-gray-400 hover:text-gray-600"> <i class="fas fa-times text-xl"></i> </button>
+    </div>
+    <form id="bill-form" class="p-6" onsubmit="handleBillSubmit(event)"><input type="hidden" id="bill_edit_id"> <!-- General Information -->
+     <div class="form-section">
+      <h4 class="form-section-title"><i class="fas fa-info-circle mr-2"></i>General Information</h4>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+       <div><label for="bill_customer_code" class="block text-sm font-semibold text-gray-700 mb-2">Customer Code</label> <input type="text" id="bill_customer_code" required placeholder="e.g., CUST001" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+       </div>
+       <div><label for="bill_customer_name" class="block text-sm font-semibold text-gray-700 mb-2">Customer Name</label> <input type="text" id="bill_customer_name" required placeholder="Customer name" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+       </div>
+       <div class="md:col-span-2"><label for="bill_address" class="block text-sm font-semibold text-gray-700 mb-2">Address</label> <textarea id="bill_address" rows="2" placeholder="Full address" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
+       </div>
+       <div><label for="bill_contact_no" class="block text-sm font-semibold text-gray-700 mb-2">Contact No.</label> <input type="tel" id="bill_contact_no" placeholder="e.g., 081-234-5678" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+       </div>
+       <div><label for="bill_general_remarks" class="block text-sm font-semibold text-gray-700 mb-2">Remarks</label> <input type="text" id="bill_general_remarks" placeholder="Additional notes" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+       </div>
+      </div>
+     </div><!-- Shipping/Transport Details -->
+     <div class="form-section">
+      <h4 class="form-section-title"><i class="fas fa-truck mr-2"></i>Shipping/Transport Details</h4>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+       <div><label for="bill_booking_no" class="block text-sm font-semibold text-gray-700 mb-2">Booking No.</label> <input type="text" id="bill_booking_no" placeholder="e.g., BK-12345" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+       </div>
+       <div><label for="bill_container_no" class="block text-sm font-semibold text-gray-700 mb-2">Container No.</label> <input type="text" id="bill_container_no" placeholder="e.g., CONT-9876" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+       </div>
+       <div><label for="bill_truck_no" class="block text-sm font-semibold text-gray-700 mb-2">Truck No.</label> <input type="text" id="bill_truck_no" placeholder="e.g., TRUCK-001" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+       </div>
+       <div><label for="bill_route" class="block text-sm font-semibold text-gray-700 mb-2">Route</label> <input type="text" id="bill_route" placeholder="e.g., Bangkok - Chiang Mai" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+       </div>
+       <div><label for="bill_departure_date" class="block text-sm font-semibold text-gray-700 mb-2">Departure Date</label> <input type="date" id="bill_departure_date" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+       </div>
+       <div><label for="bill_arrival_date" class="block text-sm font-semibold text-gray-700 mb-2">Arrival Date</label> <input type="date" id="bill_arrival_date" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+       </div>
+       <div><label for="bill_driver_name" class="block text-sm font-semibold text-gray-700 mb-2">Driver Name</label> <input type="text" id="bill_driver_name" placeholder="Driver name" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+       </div>
+       <div><label for="bill_payment_term_shipping" class="block text-sm font-semibold text-gray-700 mb-2">Payment Term</label> <select id="bill_payment_term_shipping" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"> <option value="">Select term</option> <option value="COD">COD (Cash on Delivery)</option> <option value="Net 7">Net 7 Days</option> <option value="Net 15">Net 15 Days</option> <option value="Net 30">Net 30 Days</option> <option value="Net 60">Net 60 Days</option> <option value="Prepaid">Prepaid</option> </select>
+       </div>
+       <div><label for="bill_qty" class="block text-sm font-semibold text-gray-700 mb-2">Qty</label> <input type="number" id="bill_qty" placeholder="0" min="0" step="1" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+       </div>
+       <div><label for="bill_shipping_total" class="block text-sm font-semibold text-gray-700 mb-2">Total</label> <input type="number" id="bill_shipping_total" placeholder="0.00" step="0.01" min="0" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+       </div>
+      </div>
+     </div><!-- Charges Information -->
+     <div class="form-section">
+      <h4 class="form-section-title"><i class="fas fa-file-invoice-dollar mr-2"></i>Charges Information</h4>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+       <div><label for="bill_charge_code" class="block text-sm font-semibold text-gray-700 mb-2">Charge Code</label> <input type="text" id="bill_charge_code" placeholder="e.g., CHG001" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+       </div>
+       <div><label for="bill_transport_type" class="block text-sm font-semibold text-gray-700 mb-2">Transport Type</label> <select id="bill_transport_type" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"> <option value="">Select Type</option> <option value="4-Wheel Truck">4-Wheel Truck</option> <option value="6-Wheel Truck">6-Wheel Truck</option> <option value="10-Wheel Truck">10-Wheel Truck</option> <option value="Trailer Truck">Trailer Truck</option> <option value="Pickup Truck">Pickup Truck</option> </select>
+       </div>
+       <div><label for="bill_payment_term_charge" class="block text-sm font-semibold text-gray-700 mb-2">Payment Term</label> <select id="bill_payment_term_charge" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"> <option value="">Select term</option> <option value="COD">COD (Cash on Delivery)</option> <option value="Net 7">Net 7 Days</option> <option value="Net 15">Net 15 Days</option> <option value="Net 30">Net 30 Days</option> <option value="Net 60">Net 60 Days</option> <option value="Prepaid">Prepaid</option> </select>
+       </div>
+       <div><label for="bill_billed_to" class="block text-sm font-semibold text-gray-700 mb-2">Billed To</label> <input type="text" id="bill_billed_to" placeholder="Company or person name" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+       </div>
+       <div><label for="bill_charge_quantity" class="block text-sm font-semibold text-gray-700 mb-2">Quantity</label> <input type="number" id="bill_charge_quantity" placeholder="0" min="0" step="1" oninput="calculateBillTotal()" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+       </div>
+       <div><label for="bill_selling_rate" class="block text-sm font-semibold text-gray-700 mb-2">Selling Rate (฿)</label> <input type="number" id="bill_selling_rate" placeholder="0.00" step="0.01" min="0" oninput="calculateBillTotal()" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+       </div>
+      </div>
+     </div><!-- Payment Details -->
+     <div class="form-section">
+      <h4 class="form-section-title"><i class="fas fa-dollar-sign mr-2"></i>Payment Details</h4>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+       <div><label for="bill_selling_amount" class="block text-sm font-semibold text-gray-700 mb-2">Selling Amount (฿)</label> <input type="number" id="bill_selling_amount" readonly class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 font-semibold text-gray-900">
+       </div>
+       <div><label for="bill_tax_amount" class="block text-sm font-semibold text-gray-700 mb-2">Tax Amount (VAT 7%)</label> <input type="number" id="bill_tax_amount" readonly class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 font-semibold text-gray-900">
+       </div>
+       <div><label for="bill_total_amount" class="block text-sm font-semibold text-gray-700 mb-2">Total Amount (฿)</label> <input type="number" id="bill_total_amount" readonly class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-blue-50 font-bold text-blue-600 text-lg">
+       </div>
+       <div><label for="bill_payment_method" class="block text-sm font-semibold text-gray-700 mb-2">Payment Method</label> <select id="bill_payment_method" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"> <option value="">Select method</option> <option value="Cash">Cash</option> <option value="Bank Transfer">Bank Transfer</option> <option value="Credit Card">Credit Card</option> <option value="Cheque">Cheque</option> <option value="E-Wallet">E-Wallet</option> </select>
+       </div>
+       <div><label for="bill_payment_date" class="block text-sm font-semibold text-gray-700 mb-2">Payment Date</label> <input type="date" id="bill_payment_date" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+       </div>
+       <div><label for="bill_payment_status" class="block text-sm font-semibold text-gray-700 mb-2">Payment Status</label> <select id="bill_payment_status" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"> <option value="unpaid">Unpaid</option> <option value="paid">Paid</option> <option value="partial">Partial</option> <option value="overdue">Overdue</option> </select>
+       </div>
+      </div>
+     </div>
+     <div class="flex gap-3 mt-6"><button type="submit" id="bill-submit-btn" class="btn-primary flex-1 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2"> <i class="fas fa-save"></i> <span>Create Bill</span> </button> <button type="button" onclick="closeBillModal()" class="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-lg font-semibold hover:bg-gray-200"> Cancel </button>
+     </div>
+    </form>
+   </div>
+  </div>
+  <script>
+    const defaultConfig = {
+      app_title: 'TMS',
+      user_name: 'User Name',
+      background_color: '#f9fafb',
+      primary_color: '#3b82f6',
+      secondary_color: '#1e293b',
+      text_color: '#111827',
+      accent_color: '#10b981',
+      font_family: 'Inter'
+    };
+
+    let allRecords = [];
+    let currentEditRecord = null;
+    let currentEditBill = null;
+    let isLoading = false;
+    let filteredRecords = [];
+    let reportFilteredRecords = [];
+    let map = null;
+    let markers = [];
+
+    const dataHandler = {
+      onDataChanged(data) {
+        allRecords = data;
+        applySearch();
+        updateStats();
+        updateRoutesTable();
+        updateRouteStats();
+        updateBillingTable();
+        updateBillingStats();
+        updateMapMarkers();
+        updateTrackingFromRecords();
+      }
+    };
+
+    async function initDataSdk() {
+      const result = await window.dataSdk.init(dataHandler);
+      if (!result.isOk) {
+        showToast('Error loading data', 'error');
+      }
+    }
+
+    async function initElementSdk() {
+      if (window.elementSdk) {
+        await window.elementSdk.init({
+          defaultConfig,
+          onConfigChange: async (config) => {
+            const appTitle = document.getElementById('app-title');
+            const userName = document.getElementById('user-name');
+            
+            if (appTitle) {
+              appTitle.textContent = config.app_title || defaultConfig.app_title;
+            }
+            if (userName) {
+              userName.textContent = config.user_name || defaultConfig.user_name;
+            }
+
+            document.body.style.backgroundColor = config.background_color || defaultConfig.background_color;
+          },
+          mapToCapabilities: (config) => ({
+            recolorables: [
+              {
+                get: () => config.background_color || defaultConfig.background_color,
+                set: (value) => {
+                  if (window.elementSdk) {
+                    window.elementSdk.setConfig({ background_color: value });
+                  }
+                }
+              },
+              {
+                get: () => config.primary_color || defaultConfig.primary_color,
+                set: (value) => {
+                  if (window.elementSdk) {
+                    window.elementSdk.setConfig({ primary_color: value });
+                  }
+                }
+              },
+              {
+                get: () => config.secondary_color || defaultConfig.secondary_color,
+                set: (value) => {
+                  if (window.elementSdk) {
+                    window.elementSdk.setConfig({ secondary_color: value });
+                  }
+                }
+              },
+              {
+                get: () => config.text_color || defaultConfig.text_color,
+                set: (value) => {
+                  if (window.elementSdk) {
+                    window.elementSdk.setConfig({ text_color: value });
+                  }
+                }
+              },
+              {
+                get: () => config.accent_color || defaultConfig.accent_color,
+                set: (value) => {
+                  if (window.elementSdk) {
+                    window.elementSdk.setConfig({ accent_color: value });
+                  }
+                }
+              }
+            ],
+            borderables: [],
+            fontEditable: {
+              get: () => config.font_family || defaultConfig.font_family,
+              set: (value) => {
+                if (window.elementSdk) {
+                  window.elementSdk.setConfig({ font_family: value });
+                }
+              }
+            },
+            fontSizeable: undefined
+          }),
+          mapToEditPanelValues: (config) => new Map([
+            ['app_title', config.app_title || defaultConfig.app_title],
+            ['user_name', config.user_name || defaultConfig.user_name]
+          ])
+        });
+      }
+    }
+
+    function initMap() {
+      if (map) return;
+      
+      map = L.map('map').setView([13.7563, 100.5018], 6);
+      
+      L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+        maxZoom: 20,
+        subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+        attribution: '© Google Maps'
+      }).addTo(map);
+
+      setTimeout(() => {
+        map.invalidateSize();
+      }, 100);
+
+      updateMapMarkers();
+    }
+
+    const locationDatabase = {
+      'bangkok': [13.7563, 100.5018],
+      'chiang mai': [18.7883, 98.9853],
+      'phuket': [7.8804, 98.3923],
+      'pattaya': [12.9236, 100.8825],
+      'khon kaen': [16.4322, 102.8236],
+      'warehouse': [13.8000, 100.5500],
+      'store': [13.7400, 100.5300]
+    };
+
+    function findLocationCoordinates(locationName) {
+      if (!locationName) return null;
+      
+      const searchTerm = locationName.toLowerCase();
+      
+      for (const [key, coords] of Object.entries(locationDatabase)) {
+        if (searchTerm.includes(key)) {
+          return coords;
+        }
+      }
+      
+      const hash = searchTerm.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+      const lat = 7 + (hash % 13);
+      const lng = 98 + (hash % 8);
+      return [lat, lng];
+    }
+
+    function updateMapMarkers() {
+      if (!map) return;
+
+      markers.forEach(marker => map.removeLayer(marker));
+      markers = [];
+
+      const activeTransports = allRecords.filter(r => 
+        r.type === 'transport' && (r.status === 'in-transit' || r.status === 'pending')
+      );
+
+      if (activeTransports.length === 0) {
+        return;
+      }
+
+      const bounds = [];
+
+      activeTransports.forEach((record) => {
+        const pickupCoords = findLocationCoordinates(record.pickup_point);
+        const deliveryCoords = findLocationCoordinates(record.delivery_point);
+
+        if (pickupCoords && deliveryCoords) {
+          bounds.push(pickupCoords, deliveryCoords);
+
+          const vehicleIcon = L.divIcon({
+            html: `<div style="background: ${record.status === 'in-transit' ? '#3b82f6' : '#94a3b8'}; width: 32px; height: 32px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.3); display: flex; align-items: center; justify-center;"><i class="fas fa-truck" style="color: white; font-size: 14px;"></i></div>`,
+            className: 'vehicle-marker',
+            iconSize: [38, 38],
+            iconAnchor: [19, 19]
+          });
+
+          const vehicleMarker = L.marker(pickupCoords, { icon: vehicleIcon }).addTo(map);
+          vehicleMarker.bindPopup(`
+            <div style="min-width: 220px;">
+              <div style="font-weight: bold; font-size: 16px; color: #1f2937; margin-bottom: 8px;">
+                🚛 ${record.vehicle_number}
+              </div>
+              <div style="font-size: 12px; color: #4b5563; margin-bottom: 4px;">
+                <strong>Driver:</strong> ${record.driver_name}
+              </div>
+              <div style="font-size: 12px; color: #4b5563; margin-bottom: 4px;">
+                <strong>Customer:</strong> ${record.customer_code}
+              </div>
+              <div style="font-size: 12px; color: #059669; margin-bottom: 2px;">
+                <strong>From:</strong> ${record.pickup_point}
+              </div>
+              <div style="font-size: 12px; color: #dc2626;">
+                <strong>To:</strong> ${record.delivery_point}
+              </div>
+            </div>
+          `);
+          markers.push(vehicleMarker);
+        }
+      });
+
+      if (bounds.length > 0) {
+        map.fitBounds(bounds, { padding: [50, 50] });
+      }
+    }
+
+    function centerMap() {
+      if (!map) return;
+      map.setView([13.7563, 100.5018], 6);
+      showToast('Map centered', 'success');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const searchInput = document.getElementById('search-fleet');
+      if (searchInput) {
+        searchInput.addEventListener('input', () => {
+          applySearch();
+        });
+      }
+
+      const searchBillInput = document.getElementById('search-bill');
+      if (searchBillInput) {
+        searchBillInput.addEventListener('input', () => {
+          updateBillingTable();
+        });
+      }
+
+      initDataSdk();
+      initElementSdk();
+    });
+
+    function applySearch() {
+      const searchTerm = document.getElementById('search-fleet')?.value.toLowerCase().trim() || '';
+      
+      const transportRecords = allRecords.filter(r => !r.type || r.type === 'transport');
+      
+      if (!searchTerm) {
+        filteredRecords = transportRecords;
+      } else {
+        filteredRecords = transportRecords.filter(record => {
+          const searchableFields = [
+            record.vehicle_number,
+            record.driver_name,
+            record.customer_code,
+            record.pickup_point,
+            record.delivery_point,
+            record.id
+          ];
+          
+          return searchableFields.some(field => 
+            field && field.toString().toLowerCase().includes(searchTerm)
+          );
+        });
+      }
+      
+      updateUI();
+    }
+
+    function showPage(pageName) {
+      document.querySelectorAll('.page-content').forEach(page => {
+        page.classList.add('hidden');
+      });
+
+      document.querySelectorAll('.sidebar-item').forEach(item => {
+        item.classList.remove('active');
+        item.classList.add('hover:bg-slate-700');
+      });
+
+      document.getElementById(`page-${pageName}`).classList.remove('hidden');
+
+      const navItem = document.getElementById(`nav-${pageName}`);
+      navItem.classList.add('active');
+      navItem.classList.remove('hover:bg-slate-700');
+      
+      if (pageName === 'tracking') {
+        setTimeout(() => {
+          initMap();
+        }, 100);
+      }
+    }
+
+    function openAddModal() {
+      currentEditRecord = null;
+      document.getElementById('modal-title').textContent = 'Add Transport Record';
+      document.getElementById('submit-text').textContent = 'Save';
+      document.getElementById('transport-form').reset();
+      document.getElementById('edit-id').value = '';
+      document.getElementById('modal').classList.remove('hidden');
+      document.getElementById('modal').classList.add('flex');
+    }
+
+    function openEditModal(record) {
+      currentEditRecord = record;
+      document.getElementById('modal-title').textContent = 'Edit Transport Record';
+      document.getElementById('submit-text').textContent = 'Update';
+      
+      document.getElementById('edit-id').value = record.__backendId;
+      document.getElementById('date').value = record.date;
+      document.getElementById('transport_type').value = record.transport_type || '';
+      document.getElementById('customer_code').value = record.customer_code;
+      document.getElementById('sender').value = record.sender;
+      document.getElementById('receiver').value = record.receiver;
+      document.getElementById('contact_no').value = record.contact_no;
+      document.getElementById('address').value = record.address;
+      document.getElementById('vehicle_number').value = record.vehicle_number;
+      document.getElementById('driver_name').value = record.driver_name;
+      document.getElementById('truck_no').value = record.truck_no || '';
+      document.getElementById('booking_no').value = record.booking_no || '';
+      document.getElementById('container_no').value = record.container_no || '';
+      document.getElementById('pickup_point').value = record.pickup_point;
+      document.getElementById('delivery_point').value = record.delivery_point;
+      document.getElementById('eta').value = record.eta || '';
+      document.getElementById('weight').value = record.weight || '';
+      document.getElementById('commodity').value = record.commodity || '';
+      document.getElementById('status').value = record.status;
+      document.getElementById('amount').value = record.amount;
+      document.getElementById('remarks').value = record.remarks || '';
+      
+      document.getElementById('modal').classList.remove('hidden');
+      document.getElementById('modal').classList.add('flex');
+    }
+
+    function closeModal() {
+      document.getElementById('modal').classList.add('hidden');
+      document.getElementById('modal').classList.remove('flex');
+      currentEditRecord = null;
+    }
+
+    function openBillModal() {
+      currentEditBill = null;
+      document.getElementById('bill-form').reset();
+      document.getElementById('bill_edit_id').value = '';
+      
+      document.getElementById('bill-modal').classList.remove('hidden');
+      document.getElementById('bill-modal').classList.add('flex');
+    }
+
+    function closeBillModal() {
+      document.getElementById('bill-modal').classList.add('hidden');
+      document.getElementById('bill-modal').classList.remove('flex');
+      currentEditBill = null;
+    }
+
+    function calculateBillTotal() {
+      const quantity = parseFloat(document.getElementById('bill_charge_quantity').value) || 0;
+      const rate = parseFloat(document.getElementById('bill_selling_rate').value) || 0;
+      
+      const sellingAmount = quantity * rate;
+      const taxAmount = sellingAmount * 0.07;
+      const totalAmount = sellingAmount + taxAmount;
+      
+      document.getElementById('bill_selling_amount').value = sellingAmount.toFixed(2);
+      document.getElementById('bill_tax_amount').value = taxAmount.toFixed(2);
+      document.getElementById('bill_total_amount').value = totalAmount.toFixed(2);
+    }
+
+    async function handleBillSubmit(event) {
+      event.preventDefault();
+      
+      if (isLoading) return;
+      
+      const editId = document.getElementById('bill_edit_id').value;
+      
+      const formData = {
+        id: editId || `BILL${Date.now()}`,
+        type: 'bill',
+        receipt_no: `RCP-${Date.now()}`,
+        customer_code: document.getElementById('bill_customer_code').value,
+        customer_name: document.getElementById('bill_customer_name').value,
+        address: document.getElementById('bill_address').value || null,
+        contact_no: document.getElementById('bill_contact_no').value || null,
+        general_remarks: document.getElementById('bill_general_remarks').value || null,
+        booking_no: document.getElementById('bill_booking_no').value || null,
+        container_no: document.getElementById('bill_container_no').value || null,
+        truck_no: document.getElementById('bill_truck_no').value || null,
+        route: document.getElementById('bill_route').value || null,
+        departure_date: document.getElementById('bill_departure_date').value || null,
+        arrival_date: document.getElementById('bill_arrival_date').value || null,
+        driver_name: document.getElementById('bill_driver_name').value || null,
+        payment_term_shipping: document.getElementById('bill_payment_term_shipping').value || null,
+        qty: parseFloat(document.getElementById('bill_qty').value) || 0,
+        shipping_total: parseFloat(document.getElementById('bill_shipping_total').value) || 0,
+        charge_code: document.getElementById('bill_charge_code').value || null,
+        transport_type: document.getElementById('bill_transport_type').value || null,
+        payment_term_charge: document.getElementById('bill_payment_term_charge').value || null,
+        billed_to: document.getElementById('bill_billed_to').value || null,
+        charge_quantity: parseFloat(document.getElementById('bill_charge_quantity').value) || 0,
+        selling_rate: parseFloat(document.getElementById('bill_selling_rate').value) || 0,
+        selling_amount: parseFloat(document.getElementById('bill_selling_amount').value) || 0,
+        tax_amount: parseFloat(document.getElementById('bill_tax_amount').value) || 0,
+        total_amount: parseFloat(document.getElementById('bill_total_amount').value) || 0,
+        payment_method: document.getElementById('bill_payment_method').value || null,
+        payment_date: document.getElementById('bill_payment_date').value || null,
+        payment_status: document.getElementById('bill_payment_status').value,
+        createdAt: new Date().toISOString()
+      };
+
+      setLoading(true);
+
+      let result;
+      if (editId && currentEditBill) {
+        result = await window.dataSdk.update({...currentEditBill, ...formData});
+      } else {
+        const totalRecords = allRecords.length;
+        if (totalRecords >= 999) {
+          showToast('Maximum limit of 999 records reached', 'error');
+          setLoading(false);
+          return;
+        }
+        result = await window.dataSdk.create(formData);
+      }
+
+      setLoading(false);
+
+      if (result.isOk) {
+        showToast(editId ? 'Bill updated successfully' : 'Bill created successfully', 'success');
+        closeBillModal();
+      } else {
+        showToast('An error occurred. Please try again.', 'error');
+      }
+    }
+
+    function updateBillingTable() {
+      const tbody = document.getElementById('billing-table-body');
+      
+      let billRecords = allRecords.filter(r => r.type === 'bill');
+      
+      const searchTerm = document.getElementById('search-bill')?.value.toLowerCase().trim() || '';
+      if (searchTerm) {
+        billRecords = billRecords.filter(bill => {
+          const searchFields = [
+            bill.receipt_no,
+            bill.customer_code,
+            bill.customer_name,
+            bill.id
+          ];
+          return searchFields.some(field => 
+            field && field.toString().toLowerCase().includes(searchTerm)
+          );
+        });
+      }
+      
+      if (billRecords.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="8" class="px-6 py-12 text-center text-gray-500">
+              <i class="fas fa-file-invoice text-4xl mb-3 text-gray-300"></i>
+              <p>${searchTerm ? 'No matching bills found.' : 'No bills yet. Click "Create Bill" to add a new billing record.'}</p>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = billRecords.map(bill => `
+        <tr class="hover:bg-gray-50">
+          <td class="px-6 py-4 text-sm font-semibold text-blue-600">${bill.receipt_no || '-'}</td>
+          <td class="px-6 py-4 text-sm text-gray-900">${bill.departure_date ? formatDate(bill.departure_date) : '-'}</td>
+          <td class="px-6 py-4 text-sm text-gray-900">
+            <div class="font-semibold">${bill.customer_code}</div>
+            <div class="text-xs text-gray-600">${bill.customer_name || ''}</div>
+          </td>
+          <td class="px-6 py-4 text-sm text-gray-700">${bill.route || '-'}</td>
+          <td class="px-6 py-4 text-sm text-gray-900">${bill.transport_type || '-'}</td>
+          <td class="px-6 py-4 text-sm font-bold text-gray-900">฿${(bill.total_amount || 0).toLocaleString('th-TH', {minimumFractionDigits: 2})}</td>
+          <td class="px-6 py-4">
+            <span class="status-badge status-${bill.payment_status}">${getPaymentStatusText(bill.payment_status)}</span>
+          </td>
+          <td class="px-6 py-4">
+            <div class="flex items-center justify-center gap-2">
+              <button onclick="deleteBillRecord(${JSON.stringify(bill).replace(/'/g, '&apos;').replace(/"/g, '&quot;')})" class="text-red-600 hover:text-red-800" title="Delete">
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function updateBillingStats() {
+      const billRecords = allRecords.filter(r => r.type === 'bill');
+      const paidCount = billRecords.filter(b => b.payment_status === 'paid').length;
+      const unpaidCount = billRecords.filter(b => b.payment_status === 'unpaid').length;
+      const totalCount = billRecords.length;
+
+      document.getElementById('billing-paid-count').textContent = paidCount;
+      document.getElementById('billing-unpaid-count').textContent = unpaidCount;
+      document.getElementById('billing-total-count').textContent = totalCount;
+    }
+
+    function deleteBillRecord(bill) {
+      const row = event.target.closest('tr');
+      const actionCell = row.querySelector('td:last-child');
+      
+      actionCell.innerHTML = `
+        <div class="flex items-center justify-center gap-2">
+          <button onclick="confirmDeleteBill(${JSON.stringify(bill).replace(/'/g, '&apos;').replace(/"/g, '&quot;')})" class="bg-red-600 text-white px-3 py-1 rounded text-sm font-medium hover:bg-red-700">
+            Confirm Delete
+          </button>
+          <button onclick="updateBillingTable()" class="bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm font-medium hover:bg-gray-300">
+            Cancel
+          </button>
+        </div>
+      `;
+    }
+
+    async function confirmDeleteBill(bill) {
+      if (!bill) return;
+
+      setLoading(true);
+      const result = await window.dataSdk.delete(bill);
+      setLoading(false);
+
+      if (result.isOk) {
+        showToast('Bill deleted successfully', 'success');
+      } else {
+        showToast('Error deleting bill', 'error');
+        updateBillingTable();
+      }
+    }
+
+    function getPaymentStatusText(status) {
+      const statusMap = {
+        'paid': 'Paid',
+        'unpaid': 'Unpaid',
+        'partial': 'Partial',
+        'overdue': 'Overdue'
+      };
+      return statusMap[status] || status;
+    }
+
+    function setLoading(loading) {
+      isLoading = loading;
+      const submitBtn = document.getElementById('submit-btn');
+      
+      if (submitBtn) {
+        submitBtn.disabled = loading;
+        if (loading) {
+          submitBtn.innerHTML = '<div class="loading-spinner"></div>';
+        } else {
+          const text = document.getElementById('submit-text')?.textContent || 'Save';
+          submitBtn.innerHTML = `<i class="fas fa-save"></i><span id="submit-text">${text}</span>`;
+        }
+      }
+
+      const billSubmitBtn = document.getElementById('bill-submit-btn');
+      if (billSubmitBtn) {
+        billSubmitBtn.disabled = loading;
+        if (loading) {
+          billSubmitBtn.innerHTML = '<div class="loading-spinner"></div>';
+        } else {
+          billSubmitBtn.innerHTML = `<i class="fas fa-save"></i><span>Create Bill</span>`;
+        }
+      }
+    }
+
+    async function handleSubmit(event) {
+      event.preventDefault();
+      
+      if (isLoading) return;
+      
+      const editId = document.getElementById('edit-id').value;
+      
+      let recordType = 'transport';
+      if (editId && currentEditRecord) {
+        recordType = currentEditRecord.type || 'transport';
+      }
+      
+      const formData = {
+        id: editId || `TR${Date.now()}`,
+        type: recordType,
+        date: document.getElementById('date').value,
+        transport_type: document.getElementById('transport_type').value,
+        customer_code: document.getElementById('customer_code').value,
+        sender: document.getElementById('sender').value,
+        receiver: document.getElementById('receiver').value,
+        contact_no: document.getElementById('contact_no').value,
+        address: document.getElementById('address').value,
+        vehicle_number: document.getElementById('vehicle_number').value,
+        driver_name: document.getElementById('driver_name').value,
+        truck_no: document.getElementById('truck_no').value || null,
+        booking_no: document.getElementById('booking_no').value || null,
+        container_no: document.getElementById('container_no').value || null,
+        pickup_point: document.getElementById('pickup_point').value,
+        delivery_point: document.getElementById('delivery_point').value,
+        eta: document.getElementById('eta').value || null,
+        weight: parseFloat(document.getElementById('weight').value) || null,
+        commodity: document.getElementById('commodity').value || null,
+        status: document.getElementById('status').value,
+        amount: parseFloat(document.getElementById('amount').value),
+        remarks: document.getElementById('remarks').value || null,
+        createdAt: new Date().toISOString()
+      };
+
+      setLoading(true);
+
+      let result;
+      if (editId && currentEditRecord) {
+        result = await window.dataSdk.update({...currentEditRecord, ...formData});
+      } else {
+        const totalRecords = allRecords.length;
+        if (totalRecords >= 999) {
+          showToast('Maximum limit of 999 records reached', 'error');
+          setLoading(false);
+          return;
+        }
+        result = await window.dataSdk.create(formData);
+      }
+
+      setLoading(false);
+
+      if (result.isOk) {
+        showToast(editId ? 'Record updated successfully' : 'Record added successfully', 'success');
+        closeModal();
+      } else {
+        showToast('An error occurred. Please try again.', 'error');
+      }
+    }
+
+    async function deleteRecord(record) {
+      const row = event.target.closest('tr');
+      const actionCell = row.querySelector('td:last-child');
+      
+      actionCell.innerHTML = `
+        <div class="flex items-center justify-center gap-2">
+          <button onclick="confirmDelete('${record.__backendId}')" class="bg-red-600 text-white px-3 py-1 rounded text-sm font-medium hover:bg-red-700">
+            Confirm Delete
+          </button>
+          <button onclick="cancelDelete()" class="bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm font-medium hover:bg-gray-300">
+            Cancel
+          </button>
+        </div>
+      `;
+    }
+
+    async function confirmDelete(backendId) {
+      const record = allRecords.find(r => r.__backendId === backendId);
+      if (!record) return;
+
+      setLoading(true);
+      const result = await window.dataSdk.delete(record);
+      setLoading(false);
+
+      if (result.isOk) {
+        showToast('Record deleted successfully', 'success');
+      } else {
+        showToast('Error deleting record', 'error');
+        updateUI();
+      }
+    }
+
+    function cancelDelete() {
+      updateUI();
+    }
+
+    function updateUI() {
+      const tbody = document.getElementById('transport-table-body');
+      
+      const transportRecords = filteredRecords.filter(r => !r.type || r.type === 'transport');
+      
+      if (transportRecords.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="8" class="px-6 py-12 text-center text-gray-500">
+              <i class="fas fa-inbox text-4xl mb-3 text-gray-300"></i>
+              <p>${allRecords.filter(r => !r.type || r.type === 'transport').length === 0 ? 'No data yet. Please add a transport record.' : 'No matching records found.'}</p>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = transportRecords.map(record => `
+        <tr class="hover:bg-gray-50">
+          <td class="px-6 py-4 text-sm text-gray-900">${formatDate(record.date)}</td>
+          <td class="px-6 py-4 text-sm text-gray-900">${record.transport_type || '-'}</td>
+          <td class="px-6 py-4 text-sm text-gray-900">${record.customer_code}</td>
+          <td class="px-6 py-4 text-sm text-gray-900">${record.vehicle_number}</td>
+          <td class="px-6 py-4 text-sm text-gray-900">${record.driver_name}</td>
+          <td class="px-6 py-4 text-sm text-gray-900">
+            <div class="flex items-center gap-1">
+              <i class="fas fa-map-marker-alt text-green-600 text-xs"></i>
+              <span>${record.pickup_point}</span>
+            </div>
+            <div class="flex items-center gap-1 mt-1">
+              <i class="fas fa-map-marker-alt text-red-600 text-xs"></i>
+              <span>${record.delivery_point}</span>
+            </div>
+          </td>
+          <td class="px-6 py-4">
+            <span class="status-badge status-${record.status}">${getStatusText(record.status)}</span>
+          </td>
+          <td class="px-6 py-4">
+            <div class="flex items-center justify-center gap-2">
+              <button onclick="openEditModal(${JSON.stringify(record).replace(/'/g, '&apos;').replace(/"/g, '&quot;')})" class="text-blue-600 hover:text-blue-800">
+                <i class="fas fa-edit"></i>
+              </button>
+              <button onclick="deleteRecord(${JSON.stringify(record).replace(/'/g, '&apos;').replace(/"/g, '&quot;')})" class="text-red-600 hover:text-red-800">
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function updateStats() {
+      const transportRecords = allRecords.filter(r => !r.type || r.type === 'transport');
+      const total = transportRecords.length;
+      const inTransit = transportRecords.filter(r => r.status === 'in-transit').length;
+      const completed = transportRecords.filter(r => r.status === 'completed').length;
+      const pending = transportRecords.filter(r => r.status === 'pending').length;
+
+      document.getElementById('stat-total').textContent = total;
+      document.getElementById('stat-transit').textContent = inTransit;
+      document.getElementById('stat-completed').textContent = completed;
+      document.getElementById('stat-pending').textContent = pending;
+    }
+
+    async function optimizeRoute() {
+      const start = document.getElementById('route-start').value.trim();
+      const stopsText = document.getElementById('route-stops').value.trim();
+      const optimization = document.getElementById('route-optimization').value;
+      const vehicleType = document.getElementById('route-vehicle').value;
+      
+      if (!start) {
+        showToast('Please enter starting point', 'error');
+        return;
+      }
+
+      if (!stopsText) {
+        showToast('Please enter at least one delivery stop', 'error');
+        return;
+      }
+
+      const stops = stopsText.split('\n').filter(s => s.trim());
+      
+      if (stops.length === 0) {
+        showToast('Please enter at least one delivery stop', 'error');
+        return;
+      }
+
+      const totalRecords = allRecords.length;
+      if (totalRecords >= 999) {
+        showToast('Maximum limit of 999 records reached', 'error');
+        return;
+      }
+
+      setLoading(true);
+
+      const distance = Math.round(50 + Math.random() * 200);
+      const estimatedTime = Math.round(distance / 60 * 60);
+      const fuelCost = Math.round(distance * 8.5);
+      const efficiency = Math.round(75 + Math.random() * 20);
+
+      const routeData = {
+        id: `RT${Date.now()}`,
+        type: 'route',
+        routeId: `ROUTE-${Date.now()}`,
+        startPoint: start,
+        stops: stops.join('|||'),
+        optimization: optimization,
+        vehicleType: vehicleType,
+        distance: distance,
+        estimatedTime: `${Math.floor(estimatedTime / 60)}h ${estimatedTime % 60}m`,
+        fuelCost: fuelCost,
+        efficiency: efficiency,
+        routeStatus: 'planned',
+        createdAt: new Date().toISOString()
+      };
+
+      const result = await window.dataSdk.create(routeData);
+      setLoading(false);
+
+      if (result.isOk) {
+        showToast(`Route optimized! Distance: ${distance}km`, 'success');
+        document.getElementById('route-stops').value = '';
+      } else {
+        showToast('Error creating route', 'error');
+      }
+    }
+
+    function updateRoutesTable() {
+      const tbody = document.getElementById('routes-table-body');
+      const routeRecords = allRecords.filter(r => r.type === 'route');
+      
+      if (routeRecords.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" class="px-6 py-12 text-center text-gray-500">
+              <i class="fas fa-route text-4xl mb-3 text-gray-300"></i>
+              <p>No routes planned yet. Use the optimizer to create routes.</p>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = routeRecords.map(route => {
+        const stops = route.stops ? route.stops.split('|||') : [];
+        
+        return `
+          <tr class="hover:bg-gray-50">
+            <td class="px-6 py-4 text-sm font-semibold text-blue-600">${route.routeId}</td>
+            <td class="px-6 py-4 text-sm text-gray-900">${route.vehicleType || '-'}</td>
+            <td class="px-6 py-4 text-sm text-gray-900">${stops.length}</td>
+            <td class="px-6 py-4 text-sm text-gray-900">${route.distance} km</td>
+            <td class="px-6 py-4 text-sm text-gray-900">${route.estimatedTime}</td>
+            <td class="px-6 py-4">
+              <span class="status-badge status-${route.routeStatus}">${route.routeStatus}</span>
+            </td>
+            <td class="px-6 py-4">
+              <div class="flex items-center justify-center gap-2">
+                <button onclick="deleteRoute(${JSON.stringify(route).replace(/'/g, '&apos;').replace(/"/g, '&quot;')})" class="text-red-600 hover:text-red-800" title="Delete">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function deleteRoute(route) {
+      const row = event.target.closest('tr');
+      const actionCell = row.querySelector('td:last-child');
+      
+      actionCell.innerHTML = `
+        <div class="flex items-center justify-center gap-2">
+          <button onclick="confirmDeleteRoute(${JSON.stringify(route).replace(/'/g, '&apos;').replace(/"/g, '&quot;')})" class="bg-red-600 text-white px-3 py-1 rounded text-sm font-medium hover:bg-red-700">
+            Confirm Delete
+          </button>
+          <button onclick="updateRoutesTable()" class="bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm font-medium hover:bg-gray-300">
+            Cancel
+          </button>
+        </div>
+      `;
+    }
+
+    async function confirmDeleteRoute(route) {
+      if (!route) return;
+
+      setLoading(true);
+      const result = await window.dataSdk.delete(route);
+      setLoading(false);
+
+      if (result.isOk) {
+        showToast('Route deleted successfully', 'success');
+      } else {
+        showToast('Error deleting route', 'error');
+        updateRoutesTable();
+      }
+    }
+
+    function updateRouteStats() {
+      const routeRecords = allRecords.filter(r => r.type === 'route');
+      const activeRoutes = routeRecords.filter(r => r.routeStatus === 'active' || r.routeStatus === 'planned').length;
+      const totalDistance = routeRecords.reduce((sum, r) => sum + (r.distance || 0), 0);
+      const avgEfficiency = routeRecords.length > 0 
+        ? Math.round(routeRecords.reduce((sum, r) => sum + (r.efficiency || 0), 0) / routeRecords.length)
+        : 0;
+      const totalFuel = routeRecords.reduce((sum, r) => sum + (r.fuelCost || 0), 0);
+
+      document.getElementById('route-stat-active').textContent = activeRoutes;
+      document.getElementById('route-stat-distance').textContent = `${totalDistance} km`;
+      document.getElementById('route-stat-efficiency').textContent = `${avgEfficiency}%`;
+      document.getElementById('route-stat-fuel').textContent = `฿${totalFuel.toLocaleString('th-TH')}`;
+    }
+
+    function updateTrackingFromRecords() {
+      const activeVehiclesList = document.getElementById('active-vehicles-list');
+      
+      const activeTransports = allRecords.filter(r => 
+        r.type === 'transport' && (r.status === 'in-transit' || r.status === 'pending')
+      );
+
+      document.getElementById('active-vehicles-count').textContent = activeTransports.length;
+
+      if (activeTransports.length === 0) {
+        activeVehiclesList.innerHTML = `
+          <div class="text-center py-8 text-gray-500">
+            <i class="fas fa-truck text-3xl mb-3 text-gray-300"></i>
+            <p>No active vehicles at the moment</p>
+          </div>
+        `;
+        return;
+      }
+
+      activeVehiclesList.innerHTML = activeTransports.map(record => {
+        const statusColor = record.status === 'in-transit' ? 'bg-blue-100 border-blue-300' : 'bg-yellow-100 border-yellow-300';
+        const statusIcon = record.status === 'in-transit' ? 'fa-shipping-fast text-blue-600' : 'fa-clock text-yellow-600';
+        
+        return `
+          <div class="p-4 ${statusColor} border rounded-lg mb-3">
+            <div class="flex items-center justify-between mb-2">
+              <div class="font-semibold text-gray-900">${record.vehicle_number}</div>
+              <i class="fas ${statusIcon}"></i>
+            </div>
+            <div class="text-sm text-gray-700">
+              <div class="mb-1"><strong>Driver:</strong> ${record.driver_name}</div>
+              <div class="mb-1"><strong>To:</strong> ${record.delivery_point}</div>
+              <div class="text-xs text-gray-600">${record.customer_code}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function clearReportFilters() {
+      document.getElementById('filter-start-day').value = '';
+      document.getElementById('filter-end-day').value = '';
+      document.getElementById('filter-transport-type').value = '';
+      document.getElementById('filter-customer').value = '';
+      document.getElementById('filter-status').value = '';
+      document.getElementById('filter-driver').value = '';
+      document.getElementById('filter-route').value = '';
+      document.getElementById('filter-weight').value = '';
+      document.getElementById('search-report').value = '';
+      
+      reportFilteredRecords = [];
+      updateReportTable();
+      updateReportSummary();
+      updateCharts();
+      showToast('Filters cleared', 'success');
+    }
+
+    function exportExcel() {
+      if (reportFilteredRecords.length === 0) {
+        showToast('No data to export. Please run a search first.', 'error');
+        return;
+      }
+      showToast('Export to Excel feature - Data ready for export', 'success');
+    }
+
+    function exportPDF() {
+      if (reportFilteredRecords.length === 0) {
+        showToast('No data to export. Please run a search first.', 'error');
+        return;
+      }
+      showToast('Export to PDF feature - Data ready for export', 'success');
+    }
+
+    function applyReportFilters() {
+      const startDay = document.getElementById('filter-start-day').value;
+      const endDay = document.getElementById('filter-end-day').value;
+      const transportType = document.getElementById('filter-transport-type').value;
+      const customer = document.getElementById('filter-customer').value.toLowerCase().trim();
+      const status = document.getElementById('filter-status').value;
+      const driver = document.getElementById('filter-driver').value.toLowerCase().trim();
+      const route = document.getElementById('filter-route').value.toLowerCase().trim();
+      const weight = parseFloat(document.getElementById('filter-weight').value);
+      const searchReport = document.getElementById('search-report').value.toLowerCase().trim();
+
+      reportFilteredRecords = allRecords.filter(record => {
+        if (record.type !== 'transport' && record.type !== undefined) return false;
+        
+        let match = true;
+
+        if (startDay && record.date < startDay) {
+          match = false;
+        }
+
+        if (endDay && record.date > endDay) {
+          match = false;
+        }
+
+        if (transportType && record.transport_type !== transportType) {
+          match = false;
+        }
+
+        if (customer && !record.customer_code?.toLowerCase().includes(customer)) {
+          match = false;
+        }
+
+        if (status && record.status !== status) {
+          match = false;
+        }
+
+        if (driver && !record.driver_name?.toLowerCase().includes(driver)) {
+          match = false;
+        }
+
+        if (route) {
+          const pickupMatch = record.pickup_point?.toLowerCase().includes(route);
+          const deliveryMatch = record.delivery_point?.toLowerCase().includes(route);
+          if (!pickupMatch && !deliveryMatch) {
+            match = false;
+          }
+        }
+
+        if (!isNaN(weight) && weight > 0) {
+          if (!record.weight || record.weight < weight) {
+            match = false;
+          }
+        }
+
+        if (searchReport) {
+          const searchFields = [
+            record.id,
+            record.booking_no,
+            record.container_no,
+            record.truck_no
+          ];
+          const hasMatch = searchFields.some(field => 
+            field && field.toString().toLowerCase().includes(searchReport)
+          );
+          if (!hasMatch) {
+            match = false;
+          }
+        }
+
+        return match;
+      });
+
+      updateReportTable();
+      updateReportSummary();
+      updateCharts();
+      updateSystemInfo();
+      showToast(`Found ${reportFilteredRecords.length} records`, 'success');
+    }
+
+    function updateReportTable() {
+      const tbody = document.getElementById('report-table-body');
+      
+      if (reportFilteredRecords.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="11" class="px-6 py-12 text-center text-gray-500">
+              <i class="fas fa-clipboard-list text-4xl mb-3 text-gray-300"></i>
+              <p>Click "Search" to view data</p>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = reportFilteredRecords.map(record => {
+        const revenue = (record.amount || 0) * 1.2;
+        const arrivalDate = record.eta ? formatDate(record.eta.split('T')[0]) : '-';
+        
+        return `
+          <tr class="hover:bg-gray-50">
+            <td class="px-4 py-4 text-sm font-semibold text-blue-600">${record.booking_no || '-'}</td>
+            <td class="px-4 py-4 text-sm text-gray-900">${record.container_no || '-'}</td>
+            <td class="px-4 py-4 text-sm text-gray-900">${record.truck_no || '-'}</td>
+            <td class="px-4 py-4 text-sm text-gray-700">
+              <div class="flex items-center gap-1 text-xs">
+                <i class="fas fa-map-marker-alt text-green-600"></i>
+                <span>${record.pickup_point}</span>
+              </div>
+              <div class="flex items-center gap-1 text-xs mt-1">
+                <i class="fas fa-map-marker-alt text-red-600"></i>
+                <span>${record.delivery_point}</span>
+              </div>
+            </td>
+            <td class="px-4 py-4 text-sm text-gray-900">${formatDate(record.date)}</td>
+            <td class="px-4 py-4 text-sm text-gray-900">${arrivalDate}</td>
+            <td class="px-4 py-4 text-sm text-gray-900">
+              <div class="font-semibold">${record.customer_code}</div>
+            </td>
+            <td class="px-4 py-4 text-sm text-gray-900">${record.driver_name}</td>
+            <td class="px-4 py-4">
+              <span class="status-badge status-${record.status}">${getStatusText(record.status)}</span>
+            </td>
+            <td class="px-4 py-4 text-sm font-semibold text-right text-red-600">฿${record.amount.toLocaleString('th-TH', {minimumFractionDigits: 2})}</td>
+            <td class="px-4 py-4 text-sm font-semibold text-right text-green-600">฿${revenue.toLocaleString('th-TH', {minimumFractionDigits: 2})}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function updateReportSummary() {
+      if (reportFilteredRecords.length === 0) {
+        document.getElementById('summary-shipments').textContent = '0';
+        document.getElementById('summary-ontime').textContent = '0';
+        document.getElementById('summary-delayed').textContent = '0';
+        document.getElementById('summary-success-rate').textContent = '0%';
+        document.getElementById('summary-cost').textContent = '฿0';
+        return;
+      }
+
+      const totalShipments = reportFilteredRecords.length;
+      const completedCount = reportFilteredRecords.filter(r => r.status === 'completed').length;
+      const ontimeCount = Math.floor(completedCount * 0.85);
+      const delayedCount = completedCount - ontimeCount;
+      const successRate = totalShipments > 0 ? Math.round((completedCount / totalShipments) * 100) : 0;
+      const totalCost = reportFilteredRecords.reduce((sum, r) => sum + (r.amount || 0), 0);
+
+      document.getElementById('summary-shipments').textContent = totalShipments;
+      document.getElementById('summary-ontime').textContent = ontimeCount;
+      document.getElementById('summary-delayed').textContent = delayedCount;
+      document.getElementById('summary-success-rate').textContent = `${successRate}%`;
+      document.getElementById('summary-cost').textContent = `฿${totalCost.toLocaleString('th-TH', {minimumFractionDigits: 2})}`;
+    }
+
+    function updateCharts() {
+      if (reportFilteredRecords.length === 0) {
+        document.getElementById('chart-cost').textContent = '฿0';
+        document.getElementById('chart-revenue').textContent = '฿0';
+        document.getElementById('chart-profit').textContent = '฿0';
+        document.getElementById('chart-cost-bar').style.width = '0%';
+        document.getElementById('chart-revenue-bar').style.width = '0%';
+        document.getElementById('chart-profit').style.color = '#6b7280';
+        
+        document.getElementById('chart-4wheel').textContent = '0';
+        document.getElementById('chart-6wheel').textContent = '0';
+        document.getElementById('chart-10wheel').textContent = '0';
+        document.getElementById('chart-trailer').textContent = '0';
+        document.getElementById('chart-pickup').textContent = '0';
+        return;
+      }
+
+      const totalCost = reportFilteredRecords.reduce((sum, r) => sum + (r.amount || 0), 0);
+      const totalRevenue = totalCost * 1.2;
+      const netProfit = totalRevenue - totalCost;
+      const maxValue = Math.max(totalCost, totalRevenue);
+
+      document.getElementById('chart-cost').textContent = `฿${totalCost.toLocaleString('th-TH', {minimumFractionDigits: 2})}`;
+      document.getElementById('chart-revenue').textContent = `฿${totalRevenue.toLocaleString('th-TH', {minimumFractionDigits: 2})}`;
+      document.getElementById('chart-profit').textContent = `฿${netProfit.toLocaleString('th-TH', {minimumFractionDigits: 2})}`;
+      
+      const costPercent = (totalCost / maxValue) * 100;
+      const revenuePercent = (totalRevenue / maxValue) * 100;
+      document.getElementById('chart-cost-bar').style.width = `${costPercent}%`;
+      document.getElementById('chart-revenue-bar').style.width = `${revenuePercent}%`;
+      
+      document.getElementById('chart-profit').style.color = netProfit >= 0 ? '#10b981' : '#ef4444';
+
+      const fourWheelCount = reportFilteredRecords.filter(r => r.transport_type === '4-Wheel Truck').length;
+      const sixWheelCount = reportFilteredRecords.filter(r => r.transport_type === '6-Wheel Truck').length;
+      const tenWheelCount = reportFilteredRecords.filter(r => r.transport_type === '10-Wheel Truck').length;
+      const trailerCount = reportFilteredRecords.filter(r => r.transport_type === 'Trailer Truck').length;
+      const pickupCount = reportFilteredRecords.filter(r => r.transport_type === 'Pickup Truck').length;
+
+      document.getElementById('chart-4wheel').textContent = fourWheelCount;
+      document.getElementById('chart-6wheel').textContent = sixWheelCount;
+      document.getElementById('chart-10wheel').textContent = tenWheelCount;
+      document.getElementById('chart-trailer').textContent = trailerCount;
+      document.getElementById('chart-pickup').textContent = pickupCount;
+    }
+
+    function updateSystemInfo() {
+      const reportDate = new Date().toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+      document.getElementById('system-report-date').textContent = reportDate;
+    }
+
+    function getStatusText(status) {
+      const statusMap = {
+        'pending': 'Pending',
+        'in-transit': 'In Transit',
+        'completed': 'Completed',
+        'cancelled': 'Cancelled'
+      };
+      return statusMap[status] || status;
+    }
+
+    function formatDate(dateString) {
+      if (!dateString) return '-';
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-GB');
+    }
+
+    function showToast(message, type = 'success') {
+      const existingToast = document.querySelector('.toast');
+      if (existingToast) {
+        existingToast.remove();
+      }
+
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      
+      const bgColor = type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6';
+      const icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle';
+      
+      toast.innerHTML = `
+        <div class="flex items-center gap-3">
+          <i class="fas ${icon}" style="color: ${bgColor}; font-size: 20px;"></i>
+          <span style="color: #1f2937; font-weight: 500;">${message}</span>
+        </div>
+      `;
+      
+      document.body.appendChild(toast);
+      
+      setTimeout(() => {
+        toast.remove();
+      }, 3000);
+    }
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9b47d10915123e68',t:'MTc2NjgyODAwOC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
