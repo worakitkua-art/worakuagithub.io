@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>รายรับ - รายจ่าย</title>
+    <style>
+        body {
+            font-family: Tahoma, sans-serif;
+            background: #f4f6f8;
+            padding: 20px;
+        }
+        .container {
+            max-width: 700px;
+            margin: auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 10px;
+        }
+        h1 {
+            text-align: center;
+        }
+        .summary {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        .income { color: green; }
+        .expense { color: red; }
+        .balance { font-weight: bold; }
+
+        input, select, button {
+            padding: 8px;
+            margin: 5px 0;
+            width: 100%;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+        th {
+            background: #f0f0f0;
+        }
+        .delete {
+            background: red;
+            color: white;
+            border: none;
+            padding: 5px 8px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>บันทึกรายรับ - รายจ่าย</h1>
+
+    <div class="summary">
+        <div class="income">รายรับ: <span id="totalIncome">0</span> บาท</div>
+        <div class="expense">รายจ่าย: <span id="totalExpense">0</span> บาท</div>
+        <div class="balance">คงเหลือ: <span id="balance">0</span> บาท</div>
+    </div>
+
+    <select id="type">
+        <option value="income">รายรับ</option>
+        <option value="expense">รายจ่าย</option>
+    </select>
+
+    <input type="text" id="detail" placeholder="รายละเอียด">
+    <input type="number" id="amount" placeholder="จำนวนเงิน">
+
+    <button onclick="addItem()">เพิ่มรายการ</button>
+
+    <table>
+        <thead>
+            <tr>
+                <th>ประเภท</th>
+                <th>รายละเอียด</th>
+                <th>จำนวนเงิน</th>
+                <th>ลบ</th>
+            </tr>
+        </thead>
+        <tbody id="list"></tbody>
+    </table>
+</div>
+
+<script>
+    let data = JSON.parse(localStorage.getItem("moneyData")) || [];
+
+    function addItem() {
+        const type = document.getElementById("type").value;
+        const detail = document.getElementById("detail").value;
+        const amount = parseFloat(document.getElementById("amount").value);
+
+        if (!detail || !amount) {
+            alert("กรุณากรอกข้อมูลให้ครบ");
+            return;
+        }
+
+        data.push({ type, detail, amount });
+        localStorage.setItem("moneyData", JSON.stringify(data));
+        document.getElementById("detail").value = "";
+        document.getElementById("amount").value = "";
+        render();
+    }
+
+    function deleteItem(index) {
+        data.splice(index, 1);
+        localStorage.setItem("moneyData", JSON.stringify(data));
+        render();
+    }
+
+    function render() {
+        const list = document.getElementById("list");
+        list.innerHTML = "";
+
+        let income = 0, expense = 0;
+
+        data.forEach((item, index) => {
+            if (item.type === "income") income += item.amount;
+            else expense += item.amount;
+
+            list.innerHTML += `
+                <tr>
+                    <td>${item.type === "income" ? "รายรับ" : "รายจ่าย"}</td>
+                    <td>${item.detail}</td>
+                    <td>${item.amount.toLocaleString()}</td>
+                    <td><button class="delete" onclick="deleteItem(${index})">ลบ</button></td>
+                </tr>
+            `;
+        });
+
+        document.getElementById("totalIncome").innerText = income.toLocaleString();
+        document.getElementById("totalExpense").innerText = expense.toLocaleString();
+        document.getElementById("balance").innerText = (income - expense).toLocaleString();
+    }
+
+    render();
+</script>
+
+</body>
+</html>
